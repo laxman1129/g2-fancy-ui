@@ -1,0 +1,27 @@
+{
+  "name": "lax-1129-opt-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "pack": "npm run build && evenhub pack app.json dist",
+    "simulate": "evenhub-simulator http://localhost:5173",
+    "start": "concurrently \"vite\" \"evenhub-simulator http://localhost:5173\"",
+    "deploy": "npm run build && npx evenhub login && npx evenhub upload dist/*.ehpk",
+    "stop": "pkill -f vite && pkill -f evenhub-simulator"
+  },
+  "dependencies": {
+    "@evenrealities/even_hub_sdk": "^0.0.14",
+    "upng-js": "^2.1.0"
+  },
+  "devDependencies": {
+    "@evenrealities/evenhub-cli": "latest",
+    "@evenrealities/evenhub-simulator": "latest",
+    "concurrently": "^10.0.5",
+    "typescript": "^5.7.0",
+    "vite": "^8.2.2"
+  }
+}

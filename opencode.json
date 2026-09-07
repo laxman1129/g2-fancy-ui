@@ -1,0 +1,24 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "lmstudio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LM Studio",
+      "options": {
+        "baseURL": "http://127.0.0.1:1234/v1"
+      },
+      "models": {
+        "qwen3-coder-next": {
+          "name": "qwen3-coder-next"
+        },
+        "meta/muse-glimmer": {
+          "name": "meta/muse-glimmer"
+        },
+        "text-embedding-nomic-embed-text-v1.5": {
+          "name": "text-embedding-nomic-embed-text-v1.5"
+        }
+      }
+    }
+  },
+  "model": "lmstudio/qwen3-coder-next"
+}
