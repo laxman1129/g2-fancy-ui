@@ -54,6 +54,29 @@ npm run simulate   # attach evenhub-simulator
 npm run pack       # build + pack for G2 sideload
 ```
 
+## Private testing (create & upload the .ehpk)
+
+Follow the official flow from the [Even Hub docs — Private Testing](https://hub.evenrealities.com/docs/test/private-testing):
+
+```bash
+# 1. Build your production bundle
+npm run build
+
+# 2. Pack it into .ehpk
+evenhub pack app.json dist -o myapp.ehpk
+```
+
+Then, in the dev portal **hub.evenrealities.com/login**:
+
+1. Open your project → **Private builds** tab.
+2. Upload `myapp.ehpk`.
+3. On your phone, open the **Even Realities** app → **Even Hub** tab (Developer Mode).
+4. **Me → Apps → Private builds** → tap **Install**.
+
+Within a few seconds the build is on your glasses. Launch it from the glasses home, the same way a Released app launches.
+
+> **Note:** Private testing exercises the full `.ehpk` packaging path (manifest validation, permission prompts, real launch UX) but has no HMR — every code change is a full build, re-upload, and re-install. Use [Beta Testing](https://hub.evenrealities.com/docs/test/beta-testing) to validate the 5-minute locked-phone lifecycle before submitting for review.
+
 ## Deploy to Even Hub
 
 ```bash
