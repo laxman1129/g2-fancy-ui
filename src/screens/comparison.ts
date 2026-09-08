@@ -1,8 +1,8 @@
-import { DW, DH, MF, C } from '../constants'
-import type { DrawingContext } from '../drawing-context'
-import { state } from '../state'
-import { STRATEGIES } from '../data'
-import type { Flight } from '../data'
+import { DW, DH, MF, C } from '../core/constants'
+import type { DrawingContext } from '../core/drawing-context'
+import { state } from '../core/state'
+import { STRATEGIES } from '../data/strategies'
+import type { Flight } from '../data/strategies'
 
 // Total height of the flight comparison list (rows with a note are taller)
 function listHeight(flights: Flight[]): number {

@@ -1,6 +1,7 @@
-import { DW, DH, MF, C } from '../constants'
-import type { DrawingContext } from '../drawing-context'
-import { fmtDateLong, SCENARIO } from '../helpers'
+import { DW, DH, MF, C } from '../core/constants'
+import type { DrawingContext } from '../core/drawing-context'
+import { fmtDateLong } from '../utils/date'
+import { SCENARIO } from '../utils/scenario'
 
 // Home — disruption overview with impact stats and the RUN OPTIMIZER CTA.
 export function drawHome(ctx: CanvasRenderingContext2D, d: DrawingContext = { w: DW, h: DH, c: C }) {

@@ -1,7 +1,7 @@
-import { DW, DH, MF, C } from '../constants'
-import type { DrawingContext } from '../drawing-context'
-import { state } from '../state'
-import { STRATEGIES } from '../data'
+import { DW, DH, MF, C } from '../core/constants'
+import type { DrawingContext } from '../core/drawing-context'
+import { state } from '../core/state'
+import { STRATEGIES } from '../data/strategies'
 
 // Options — the four recovery strategy cards, one per column.
 export function drawOptions(ctx: CanvasRenderingContext2D, d: DrawingContext = { w: DW, h: DH, c: C }) {

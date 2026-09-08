@@ -1,7 +1,7 @@
-import { DW, DH, MF, C } from '../constants'
-import type { DrawingContext } from '../drawing-context'
-import { state } from '../state'
-import { STRATEGIES } from '../data'
+import { DW, DH, MF, C } from '../core/constants'
+import type { DrawingContext } from '../core/drawing-context'
+import { state } from '../core/state'
+import { STRATEGIES } from '../data/strategies'
 
 // Max scroll offset for the review exceptions list
 export function reviewMaxScroll(): number {
