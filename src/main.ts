@@ -6,86 +6,17 @@ import {
   CreateStartUpPageContainer,
   OsEventTypeList,
 } from '@evenrealities/even_hub_sdk'
-import UPNG from 'upng-js'
+import { DW, DH, QW, QH, QUADS } from './constants'
+import { state } from './state'
+import { fmtDateShort } from './helpers'
+import { toGray4, toPngUrl } from './rendering'
+import { drawHome } from './screens/home'
+import { drawOptions } from './screens/options'
+import { drawComparison, comparisonMaxScroll } from './screens/comparison'
+import { drawReview, reviewMaxScroll } from './screens/review'
+import { drawPublish } from './screens/publish'
+import { drawDone } from './screens/done'
 import { STRATEGIES } from './data'
-import type { Flight } from './data'
-
-// ─── Display geometry ──────────────────────────────────────────────────────
-const DW = 576   // full display width
-const DH = 288   // full display height
-const QW = 288   // quadrant width  (SDK max per image container)
-const QH = 144   // quadrant height (SDK max per image container)
-
-// Four image containers tile the full 576×288 display
-const QUADS = [
-  { id: 1, name: 'q_tl', x: 0,  y: 0   },   // top-left
-  { id: 2, name: 'q_tr', x: QW, y: 0   },   // top-right
-  { id: 3, name: 'q_bl', x: 0,  y: QH  },   // bottom-left
-  { id: 4, name: 'q_br', x: QW, y: QH  },   // bottom-right
-]
-
-// ─── App state ─────────────────────────────────────────────────────────────
-type Screen = 'HOME' | 'OPTIONS' | 'COMPARISON' | 'REVIEW' | 'PUBLISH' | 'DONE'
-
-let screen: Screen = 'HOME'
-let strategyIdx = 0
-let published   = false
-let compScroll  = 0
-let exScroll    = 0
-
-// ─── Random disruption scenario (generated once on load) ───────────────────
-function randInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min
-}
-
-function pad2(n: number): string { return String(n).padStart(2, '0') }
-
-interface Scenario {
-  flights: number
-  pax: number
-  delay: string      // display like "+14h 20m"
-  curfew: string     // display like "02:00 – 06:00"
-  cancels: number
-}
-
-function makeScenario(): Scenario {
-  const flights = randInt(25, 70)
-  const pax     = randInt(750, 7500)
-  const h       = randInt(3, 30)
-  const m       = [0, 10, 15, 20, 30, 40, 45, 50][randInt(0, 7)]
-  const gap     = randInt(3, 18)
-  const startH  = randInt(0, 24 - gap)   // keep window within a single day
-  const cancels = randInt(2, Math.max(3, Math.round(flights * 0.1)))
-  return {
-    flights,
-    pax,
-    delay: `+${h}h ${pad2(m)}m`,
-    curfew: `${pad2(startH)}:00 – ${pad2(startH + gap)}:00`,
-    cancels,
-  }
-}
-
-const SCENARIO: Scenario = makeScenario()
-
-// ─── Current date/time helpers ─────────────────────────────────────────────
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-
-function fmtDateLong(d: Date = new Date()): string {
-  return `${pad2(d.getUTCDate())} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
-}
-
-function fmtDateShort(d: Date = new Date()): string {
-  const m = MONTHS[d.getUTCMonth()]
-  return `${pad2(d.getUTCDate())} ${m.charAt(0)}${m.slice(1, 3).toLowerCase()}`
-}
-
-function fmtDateCompact(d: Date = new Date()): string {
-  return `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}`
-}
-
-function fmtTimeUTC(d: Date = new Date()): string {
-  return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} UTC`
-}
 
 // ─── Event capture ─────────────────────────────────────────────────────────
 // The G2 firmware allows only ONE event-capturing container per page, so a
@@ -93,789 +24,6 @@ function fmtTimeUTC(d: Date = new Date()): string {
 // A tap therefore performs the current screen's primary action (i.e. the
 // drawn CTA button), which is the highest-fidelity "button" available here.
 const C_GESTURE = 9
-
-// ─── Typography & palette ──────────────────────────────────────────────────
-const MF = '"JetBrains Mono","SF Mono","Fira Code","Consolas",ui-monospace,monospace'
-
-// Grayscale palette — spread across full 16-level gray range for G2 4-bit display
-// After quantization: 0, 1, 2, 3, 5, 7, 9, 11, 13, 15
-const C = {
-  bg:      '#000000',   // level  0
-  bg1:     '#080808',   // level  1
-  bg2:     '#151515',   // level  1
-  bg3:     '#222222',   // level  2
-  border:  '#333333',   // level  3
-  dim:     '#555555',   // level  5
-  muted:   '#777777',   // level  7
-  mid:     '#999999',   // level  9
-  sub:     '#BBBBBB',   // level 11
-  text:    '#E0E0E0',   // level 13
-  bright:  '#FFFFFF',   // level 15
-  invert:  '#FFFFFF',   // for selected-item text on white bg
-  sel:     '#FFFFFF',   // selected item background
-  selText: '#000000',
-}
-
-// ─── Canvas → packed gray4 number[] ────────────────────────────────────────
-// G2 expects two 4-bit luma nibbles per byte: byte = (g0 << 4) | g1
-// Floyd–Steinberg error diffusion preserves sub-level detail lost by direct
-// quantization, smoothing anti-aliased text edges and eliminating banding on
-// the 16-level gray display.
-function toGray4(canvas: HTMLCanvasElement): number[] {
-  const ctx = canvas.getContext('2d')!
-  const d   = ctx.getImageData(0, 0, canvas.width, canvas.height).data
-  const w   = canvas.width
-  const h   = canvas.height
-  const n   = w * h
-
-  const err = new Float32Array(n + w)   // +w row guard for bottom-row writes
-  for (let y = 0; y < h; y++) {
-    const row = y * w
-    for (let x = 0; x < w; x++) {
-      const i  = row + x
-      const a  = i << 2
-      const luma = (0.299 * d[a] + 0.587 * d[a + 1] + 0.114 * d[a + 2]) / 255 * 15
-      const val = Math.max(0, Math.min(15, luma + err[i]))
-      const q = Math.round(val)
-      const e = val - q
-
-      // Distribute quantization error (Floyd–Steinberg coefficients)
-      if (x + 1 < w) err[i + 1]      += e * 7 / 16
-      const rowN = row + w
-      if (y + 1 < h) {
-        if (x > 0)     err[rowN + x - 1] += e * 3 / 16
-        err[rowN + x]                   += e * 5 / 16
-        if (x + 1 < w) err[rowN + x + 1] += e * 1 / 16
-      }
-      err[i] = q
-    }
-  }
-
-  const out = new Array<number>(n >> 1)
-  for (let i = 0; i < n; i += 2) {
-    out[i >> 1] = ((err[i] & 0xF) << 4) | ((i + 1 < n ? err[i + 1] : 0) & 0xF)
-  }
-  return out
-}
-
-// UPNG → base64 data URL (used by companion mirror)
-function toPngUrl(canvas: HTMLCanvasElement): string {
-  const ctx  = canvas.getContext('2d')!
-  const img  = ctx.getImageData(0, 0, canvas.width, canvas.height)
-  const buf  = UPNG.encode([img.data.buffer], canvas.width, canvas.height, 0)
-  const u8   = new Uint8Array(buf)
-  let b64 = ''
-  for (let i = 0; i < u8.length; i++) b64 += String.fromCharCode(u8[i])
-  return `data:image/png;base64,${btoa(b64)}`
-}
-
-// ─── Screen drawing functions ──────────────────────────────────────────────
-// Each draws onto a 576×288 canvas.  No title bar, no nav bar — full bleed.
-
-function drawHome(ctx: CanvasRenderingContext2D) {
-  const W = DW, H = DH
-
-  ctx.fillStyle = C.bg
-  ctx.fillRect(0, 0, W, H)
-
-  // Top accent strip — outline only
-  ctx.strokeStyle = C.border
-  ctx.lineWidth = 1
-  ctx.strokeRect(0.5, 0.5, W - 1, 43)
-  ctx.fillStyle = C.border
-  ctx.fillRect(0, 44, W, 1)
-
-  // Alert tag
-  ctx.fillStyle = C.bright
-  ctx.font = `bold 13px ${MF}`
-  ctx.letterSpacing = '0.14em'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('▸ DISRUPTION ALERT', 16, 16)
-
-  // Date / hub / event
-  ctx.fillStyle = C.sub
-  ctx.font = `12px ${MF}`
-  ctx.letterSpacing = '0.04em'
-  ctx.fillText(`${fmtDateLong()}  ·  GOI HUB  ·  STORM CELL MC-47`, 16, 33)
-
-  // Three large stat boxes
-  const stats = [
-    { val: String(SCENARIO.flights), label: 'FLIGHTS\nIMPACTED' },
-    { val: SCENARIO.pax.toLocaleString(), label: 'PAX\nAFFECTED' },
-    { val: SCENARIO.delay, label: 'AVG\nDELAY' },
-  ]
-  const bw = Math.floor((W - 48) / 3)
-  stats.forEach((s, i) => {
-    const bx = 16 + i * (bw + 8)
-    const by = 56
-
-    ctx.strokeStyle = C.bright
-    ctx.lineWidth = 1
-    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 91)
-
-    ctx.fillStyle = C.bright
-    ctx.font      = `bold 34px ${MF}`
-    ctx.letterSpacing = '-0.02em'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(s.val, bx + bw / 2, by + 38)
-
-    ctx.fillStyle = C.sub
-    ctx.font = `11px ${MF}`
-    ctx.letterSpacing = '0.08em'
-    const lines = s.label.split('\n')
-    lines.forEach((l, li) => ctx.fillText(l, bx + bw / 2, by + 62 + li * 15))
-  })
-
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'alphabetic'
-
-  // Secondary info row
-  ctx.fillStyle = C.dim
-  ctx.fillRect(16, 158, W - 32, 1)
-
-  ctx.fillStyle = C.bright
-  ctx.font = `bold 13px ${MF}`
-  ctx.letterSpacing = '0.02em'
-  ctx.textBaseline = 'top'
-  ctx.fillText(`${SCENARIO.cancels} cancellations`, 16, 166)
-  ctx.fillText('4 recovery strategies ready', 16, 184)
-
-  ctx.fillStyle = C.sub
-  ctx.font = `12px ${MF}`
-  ctx.fillText(`Curfew window  ${SCENARIO.curfew} UTC`, 16, 202)
-  ctx.fillStyle = C.sub
-  ctx.fillText(`Optimizer ready  ·  Delay recover  –34h`, 16, 220)
-
-  // CTA bar
-  ctx.strokeStyle = C.bright
-  ctx.lineWidth = 2
-  ctx.strokeRect(0.5, H - 44.5, W - 1, 43)
-
-  ctx.fillStyle = C.bright
-  ctx.font = `bold 14px ${MF}`
-  ctx.letterSpacing = '0.12em'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('TAP  →  RUN OPTIMIZER', W / 2, H - 22)
-  ctx.textAlign = 'left'
-}
-
-function drawOptions(ctx: CanvasRenderingContext2D) {
-  const W = DW, H = DH
-  ctx.fillStyle = C.bg
-  ctx.fillRect(0, 0, W, H)
-
-  // Header — outline only
-  ctx.strokeStyle = C.border
-  ctx.lineWidth = 1
-  ctx.strokeRect(0.5, 0.5, W - 1, 33)
-  ctx.fillStyle = C.border
-  ctx.fillRect(0, 34, W, 1)
-  ctx.fillStyle = C.text
-  ctx.font = `bold 12px ${MF}`
-  ctx.letterSpacing = '0.12em'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('SELECT RECOVERY STRATEGY', 16, 17)
-  ctx.fillStyle = C.sub
-  ctx.font = `10px ${MF}`
-  ctx.letterSpacing = '0.04em'
-  ctx.fillText('SCROLL TO NAVIGATE  ·  TAP TO CONFIRM', W - 16 - 220, 17)
-
-  // Strategy cards — one column each (144px wide)
-  const cw = Math.floor(W / 4)
-  STRATEGIES.forEach((s, i) => {
-    const cx = i * cw
-    const sel = i === strategyIdx
-
-    // Card frame — selected card gets a bold bright outline
-    ctx.strokeStyle = sel ? C.bright : C.border
-    ctx.lineWidth = sel ? 3 : 1
-    ctx.strokeRect(cx + 1.5, 36.5, cw - 4, H - 38)
-
-    // Header strip divider (top of each card)
-    ctx.fillStyle = sel ? C.bright : C.border
-    ctx.fillRect(cx + 2, 61, cw - 4, 1)
-
-    // ── Top row: ID badge + recommended star ──
-    ctx.strokeStyle = sel ? C.bright : C.mid
-    ctx.lineWidth = 1
-    ctx.strokeRect(cx + 8.5, 42.5, 27, 17)
-    ctx.fillStyle = sel ? C.bright : C.text
-    ctx.font = `bold 12px ${MF}`
-    ctx.letterSpacing = '0'
-    ctx.textBaseline = 'middle'
-    ctx.textAlign = 'center'
-    ctx.fillText(s.id, cx + 8 + 14, 51)
-    ctx.textAlign = 'left'
-
-    if (s.recommended) {
-      ctx.fillStyle = C.bright
-      ctx.font = `13px ${MF}`
-      ctx.fillText('★', cx + cw - 20, 48)
-      ctx.font = `8px ${MF}`
-      ctx.letterSpacing = '0.06em'
-      ctx.fillText('BEST', cx + cw - 20, 58)
-    }
-
-    // ── Name ──
-    ctx.fillStyle = sel ? C.bright : C.text
-    ctx.font = `bold 14px ${MF}`
-    ctx.letterSpacing = '0'
-    ctx.textBaseline = 'top'
-    const words = s.name.split(' ')
-    let line = ''
-    let ly = 68
-    for (const w of words) {
-      const test = line ? `${line} ${w}` : w
-      if (ctx.measureText(test).width > cw - 20 && line) {
-        ctx.fillText(line, cx + 10, ly); ly += 17; line = w
-      } else { line = test }
-    }
-    if (line) ctx.fillText(line, cx + 10, ly)
-
-    // ── Summary ──
-    ly += 22
-    ctx.fillStyle = sel ? C.sub : C.mid
-    ctx.font = `10px ${MF}`
-    ctx.letterSpacing = '0.02em'
-    const sumWords = s.summary.split(' ')
-    let sline = ''
-    for (const w of sumWords) {
-      const test = sline ? `${sline} ${w}` : w
-      if (ctx.measureText(test).width > cw - 20 && sline) {
-        ctx.fillText(sline, cx + 10, ly); ly += 14; sline = w
-      } else { sline = test }
-    }
-    if (sline) ctx.fillText(sline, cx + 10, ly)
-
-    // ── Cost — amount + "vs …" on two centered lines ──
-    ly += 26
-    ctx.fillStyle = C.bg3
-    ctx.fillRect(cx + 10, ly - 6, cw - 20, 1)
-    ctx.fillStyle = sel ? C.bright : C.text
-    ctx.font = `bold 15px ${MF}`
-    ctx.letterSpacing = '0'
-    ctx.textAlign = 'center'
-    const costParts = s.cost.split(' vs ')
-    ctx.textBaseline = 'top'
-    ctx.fillText(costParts[0], cx + cw / 2, ly)
-    if (costParts[1]) {
-      ctx.font = `10px ${MF}`
-      ctx.fillStyle = sel ? C.bright : C.mid
-      ctx.fillText(`vs ${costParts[1]}`, cx + cw / 2, ly + 17)
-      ly += 33
-    } else {
-      ly += 17
-    }
-    ctx.textAlign = 'left'
-
-    // ── PAX section ──
-    ly += 4
-    ctx.fillStyle = sel ? C.bright : C.mid
-    ctx.font = `9px ${MF}`
-    ctx.letterSpacing = '0.06em'
-    ctx.fillText('PAX COVERED', cx + 8, ly)
-    ctx.textAlign = 'right'
-    ctx.fillStyle = sel ? C.bright : C.text
-    ctx.font = `bold 13px ${MF}`
-    ctx.fillText(`${s.paxPct}%`, cx + cw - 8, ly - 2)
-    ctx.textAlign = 'left'
-    ly += 13
-
-    // PAX bar
-    ctx.strokeStyle = sel ? C.bright : C.mid
-    ctx.lineWidth = 1
-    ctx.strokeRect(cx + 8.5, ly + 0.5, cw - 18, 5)
-    ctx.fillStyle = sel ? C.bright : C.text
-    ctx.fillRect(cx + 8, ly + 2, Math.floor((cw - 18) * s.paxPct / 100), 1)
-    ly += 12
-
-    // ── Exceptions / open footer ──
-    ly += 8
-    ctx.fillStyle = sel ? C.bright : C.sub
-    ctx.font = `10px ${MF}`
-    ctx.letterSpacing = '0'
-    ctx.textBaseline = 'top'
-    ctx.fillText(`${s.exceptions} EXCEP  ·  ${s.open} OPEN`, cx + 8, ly)
-  })
-}
-
-// Total height of the flight comparison list (rows with a note are taller)
-function listHeight(flights: Flight[]): number {
-  const ROW_H = 22
-  const NOTE_H = 13
-  const step = ROW_H + NOTE_H
-  return flights.reduce((acc, f) => acc + (f.note ? step : ROW_H), 0)
-}
-
-// Max scroll offset for the flight comparison list
-function comparisonMaxScroll(): number {
-  const HEADER_BOTTOM = 48
-  const FTR = 36
-  const SCROLL_H = DH - HEADER_BOTTOM - FTR
-  return Math.max(0, listHeight(STRATEGIES[strategyIdx].flights) - SCROLL_H)
-}
-
-// Max scroll offset for the review exceptions list (mirrors layout in drawReview)
-function reviewMaxScroll(): number {
-  const EX_TOP = 34
-  const EX_BOT = DH - 42
-  const EX_H = 93
-  const exH = EX_BOT - EX_TOP
-  return Math.max(0, STRATEGIES[strategyIdx].review.exceptions.length * EX_H - exH)
-}
-
-function drawComparison(ctx: CanvasRenderingContext2D) {
-  const W = DW, H = DH
-  const s = STRATEGIES[strategyIdx]
-
-  // Fixed header height; the flight list scrolls below it
-  const HEADER_BOTTOM = 48
-  const FTR = 36          // footer/scroll-hint band
-  const SCROLL_H = H - HEADER_BOTTOM - FTR
-  const ROW_H  = 22       // primary line height (note shown on a 2nd row)
-  const NOTE_H = 13       // note line height
-
-  ctx.fillStyle = C.bg
-  ctx.fillRect(0, 0, W, H)
-
-  // Header — outline only
-  ctx.strokeStyle = C.border
-  ctx.lineWidth = 1
-  ctx.strokeRect(0.5, 0.5, W - 1, 29)
-  ctx.fillStyle = C.border
-  ctx.fillRect(0, 30, W, 1)
-  ctx.fillStyle = C.text
-  ctx.font = `bold 12px ${MF}`
-  ctx.letterSpacing = '0.1em'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(`FLIGHT COMPARISON  ·  STRATEGY ${s.id}  ·  ${s.name.toUpperCase()}`, 14, 15)
-
-  // Column headers
-  const cols = { icon: 14, flight: 30, route: 96, doNothing: 186, arrow: 322, proposed: 342, status: 498 }
-  ctx.fillStyle = C.mid
-  ctx.font = `11px ${MF}`
-  ctx.letterSpacing = '0.08em'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('FLT',      cols.flight, 42)
-  ctx.fillText('ROUTE',    cols.route,  42)
-  ctx.fillText('DO NOTHING', cols.doNothing, 42)
-  ctx.fillText('PROPOSED', cols.proposed, 42)
-
-  ctx.fillStyle = C.border
-  ctx.fillRect(0, HEADER_BOTTOM, W, 1)
-
-  // ── Scrollable flight list ──
-  const flights = STRATEGIES[strategyIdx].flights
-  const step = ROW_H + NOTE_H          // rows with a note are taller
-  const maxOffset = Math.max(0, listHeight(flights) - SCROLL_H)
-
-  // Clip list drawing to the scrollable viewport so rows don't bleed into the footer
-  ctx.save()
-  ctx.beginPath()
-  ctx.rect(0, HEADER_BOTTOM + 1, W, SCROLL_H - 1)
-  ctx.clip()
-
-  let y = HEADER_BOTTOM + 1 - compScroll
-  for (const f of flights) {
-    const isNote = !!f.note
-    const rh = isNote ? step : ROW_H
-    const invisible = y + rh <= HEADER_BOTTOM + 1 || y >= HEADER_BOTTOM + SCROLL_H
-    if (!invisible) {
-      // Row separator
-      ctx.fillStyle = C.bg2
-      ctx.fillRect(0, y, W, 1)
-
-      // Primary line vertically centered within ROW_H
-      const ym = y + ROW_H / 2
-
-      // Status icon
-      ctx.fillStyle = f.ok ? C.mid : C.bright
-      ctx.font = `bold 13px ${MF}`
-      ctx.letterSpacing = '0'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(f.ok ? '✓' : '⚠', cols.icon, ym)
-
-      // Flight
-      ctx.fillStyle = C.bright
-      ctx.font = `bold 13px ${MF}`
-      ctx.fillText(f.flight, cols.flight, ym)
-
-      // Route
-      ctx.fillStyle = C.sub
-      ctx.font = `11px ${MF}`
-      ctx.fillText(f.route, cols.route, ym)
-
-      // Do-Nothing
-      ctx.fillStyle = f.doNothing.includes('CANCEL') ? C.mid : C.sub
-      ctx.font = `12px ${MF}`
-      ctx.fillText(f.doNothing.trim(), cols.doNothing, ym)
-
-      // Arrow
-      ctx.fillStyle = C.mid
-      ctx.font = `12px ${MF}`
-      ctx.fillText('→', cols.arrow, ym)
-
-      // Proposed — clip to avoid overflowing into the note/right region
-      ctx.save()
-      ctx.beginPath()
-      ctx.rect(cols.proposed, HEADER_BOTTOM, W - cols.proposed, SCROLL_H)
-      ctx.clip()
-      const pColor = f.proposed.trim() === 'OPEN'    ? C.sub
-                   : f.proposed.trim() === 'ON TIME' ? C.bright
-                   : C.text
-      ctx.fillStyle = pColor
-      ctx.font = `bold 13px ${MF}`
-      ctx.fillText(f.proposed.trim(), cols.proposed, ym)
-      ctx.restore()
-
-      // Note — second line, full-width hint
-      if (f.note) {
-        ctx.fillStyle = C.mid
-        ctx.font = `10px ${MF}`
-        ctx.letterSpacing = '0.02em'
-        ctx.textBaseline = 'top'
-        ctx.fillText(f.note, cols.route, y + ROW_H + 2)
-      }
-    }
-    y += rh
-  }
-
-  // Final row separator
-  ctx.fillStyle = C.bg2
-  ctx.fillRect(0, y, W, 1)
-  ctx.restore()
-
-  // ── Footer: scroll hint or "list fits" indicator ──
-  ctx.fillStyle = C.border
-  ctx.fillRect(0, H - FTR, W, 1)
-  const listH = listHeight(flights)
-  const canScroll = listH > SCROLL_H
-  ctx.fillStyle = C.mid
-  ctx.font = `9px ${MF}`
-  ctx.letterSpacing = '0.06em'
-  ctx.textBaseline = 'middle'
-  if (canScroll) {
-    const atTop    = compScroll <= 0
-    const atBottom = compScroll >= maxOffset
-    const up = atTop    ? ' ' : '▲'
-    const dn = atBottom ? ' ' : '▼'
-    ctx.textAlign = 'center'
-    ctx.fillText(`SCROLL   ${up}  ${flights.length} FLIGHTS  ${dn}`, W / 2, H - FTR / 2)
-    ctx.textAlign = 'left'
-  } else {
-    ctx.textAlign = 'center'
-    ctx.fillText(`TAP A FLIGHT  ·  ${flights.length} FLIGHTS  ·  DOUBLE-TAP BACK`, W / 2, H - FTR / 2)
-    ctx.textAlign = 'left'
-  }
-}
-
-function drawReview(ctx: CanvasRenderingContext2D) {
-  const W = DW, H = DH
-  const s = STRATEGIES[strategyIdx]
-  ctx.fillStyle = C.bg
-  ctx.fillRect(0, 0, W, H)
-
-  // ── Left half: key metrics (288px wide) ──────────────────────────────────
-  const lw = Math.floor(W / 2)
-
-  // Left panel — outline only
-  ctx.strokeStyle = C.border
-  ctx.lineWidth = 1
-  ctx.strokeRect(0.5, 0.5, lw - 1, H - 1)
-
-  // Section label
-  ctx.fillStyle = C.mid
-  ctx.font = `bold 11px ${MF}`
-  ctx.letterSpacing = '0.12em'
-  ctx.textBaseline = 'top'
-  ctx.fillText(`STRATEGY ${s.id} · OUTCOME SUMMARY`, 14, 12)
-
-  ctx.fillStyle = C.border
-  ctx.fillRect(14, 26, lw - 28, 1)
-
-  // Three stacked big-number metrics
-  const metrics = STRATEGIES[strategyIdx].review.metrics
-
-  metrics.forEach((m, i) => {
-    const my = 34 + i * 68
-    ctx.fillStyle = C.bright
-    ctx.font      = `bold 38px ${MF}`
-    ctx.letterSpacing = '-0.02em'
-    ctx.textBaseline = 'top'
-    ctx.fillText(m.val, 14, my)
-
-    ctx.fillStyle = C.sub
-    ctx.font      = `11px ${MF}`
-    ctx.letterSpacing = '0.06em'
-    ctx.fillText(m.sub, 14, my + 44)
-
-    ctx.fillStyle = C.bg3
-    ctx.fillRect(14, my + 60, lw - 28, 1)
-  })
-
-  // Est. completion
-  ctx.fillStyle = C.muted
-  ctx.font = `11px ${MF}`
-  ctx.letterSpacing = '0.04em'
-  ctx.fillText(STRATEGIES[strategyIdx].review.completion, 14, 242)
-
-  // Vertical divider
-  ctx.fillStyle = C.border
-  ctx.fillRect(lw, 0, 1, H)
-
-  // ── Right half: exceptions + CTA (288px wide) ────────────────────────────
-  const rx = lw + 1
-
-  ctx.fillStyle = C.mid
-  ctx.font = `bold 11px ${MF}`
-  ctx.letterSpacing = '0.12em'
-  ctx.textBaseline = 'top'
-  ctx.fillText('EXCEPTIONS & OPEN ITEMS', rx + 13, 12)
-
-  ctx.fillStyle = C.border
-  ctx.fillRect(rx + 13, 26, lw - 28, 1)
-
-  const exceptions = STRATEGIES[strategyIdx].review.exceptions
-  const EX_TOP = 34
-  const EX_BOT = H - 42
-  const EX_H = 93
-  const exH = EX_BOT - EX_TOP
-  const maxExScroll = Math.max(0, exceptions.length * EX_H - exH)
-
-  if (exceptions.length === 0) {
-    ctx.fillStyle = C.bright
-    ctx.font = `14px ${MF}`
-    ctx.letterSpacing = '0'
-    ctx.textBaseline = 'top'
-    ctx.fillText('✓ NO EXCEPTIONS', rx + 13, 42)
-    ctx.fillStyle = C.mid
-    ctx.font = `11px ${MF}`
-    ctx.fillText('All flights fully covered', rx + 13, 64)
-  } else {
-    ctx.save()
-    ctx.beginPath()
-    ctx.rect(rx + 12, EX_TOP, lw - 25, exH)
-    ctx.clip()
-
-    let ey = EX_TOP - exScroll
-    exceptions.forEach(e => {
-      // Badge — outline only
-      ctx.strokeStyle = C.mid
-      ctx.lineWidth = 1
-      ctx.strokeRect(rx + 13.5, ey + 0.5, lw - 29, 15)
-      ctx.fillStyle = C.sub
-      ctx.font = `bold 10px ${MF}`
-      ctx.letterSpacing = '0.1em'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(`⚠ ${e.badge}`, rx + 17, ey + 8)
-      ey += 19
-
-      ctx.fillStyle = C.bright
-      ctx.font = `bold 20px ${MF}`
-      ctx.letterSpacing = '0'
-      ctx.textBaseline = 'top'
-      ctx.fillText(e.flight, rx + 13, ey)
-
-      ctx.fillStyle = C.sub
-      ctx.font = `12px ${MF}`
-      ctx.fillText(e.route, rx + 74, ey + 3)
-      ey += 26
-
-      e.lines.forEach(l => {
-        ctx.fillStyle = C.mid
-        ctx.font = `11px ${MF}`
-        ctx.fillText(l, rx + 13, ey)
-        ey += 16
-      })
-
-      ctx.fillStyle = C.bg3
-      ctx.fillRect(rx + 13, ey + 4, lw - 28, 1)
-      ey += 16
-    })
-    ctx.restore()
-
-    if (maxExScroll > 0) {
-      ctx.fillStyle = C.mid
-      ctx.font = `10px ${MF}`
-      ctx.letterSpacing = '0'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(exScroll > 0 ? '▲' : '', rx + lw - 6, EX_TOP + 10)
-      ctx.fillText(exScroll < maxExScroll ? '▼' : '', rx + lw - 6, EX_BOT - 10)
-      ctx.textAlign = 'left'
-    }
-  }
-
-  // CTA bar — outline only
-  ctx.strokeStyle = C.bright
-  ctx.lineWidth = 2
-  ctx.strokeRect(rx + 0.5, H - 38.5, lw - 1, 37)
-
-  ctx.fillStyle = C.bright
-  ctx.font = `bold 14px ${MF}`
-  ctx.letterSpacing = '0.1em'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('TAP  →  PUBLISH', rx + lw / 2, H - 20)
-  ctx.textAlign = 'left'
-}
-
-function drawPublish(ctx: CanvasRenderingContext2D) {
-  const W = DW, H = DH
-  const s = STRATEGIES[strategyIdx]
-  ctx.fillStyle = C.bg
-  ctx.fillRect(0, 0, W, H)
-
-  // Header — outline only
-  ctx.strokeStyle = C.border
-  ctx.lineWidth = 1
-  ctx.strokeRect(0.5, 0.5, W - 1, 37)
-  ctx.fillStyle = C.border
-  ctx.fillRect(0, 38, W, 1)
-  ctx.fillStyle = C.bright
-  ctx.font = `bold 16px ${MF}`
-  ctx.letterSpacing = '0.08em'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(`PUBLISH PLAN  ·  STRATEGY ${s.id}`, 16, 19)
-
-  // Two-column layout
-  const colW = Math.floor(W / 2) - 24
-
-  // Left: notifications sent
-  ctx.fillStyle = C.mid
-  ctx.font = `bold 11px ${MF}`
-  ctx.letterSpacing = '0.12em'
-  ctx.textBaseline = 'top'
-  ctx.fillText('SYSTEMS NOTIFIED', 16, 48)
-  ctx.fillStyle = C.border
-  ctx.fillRect(16, 60, colW, 1)
-
-  const notified = s.publish.notified
-  let ly = 66
-  notified.forEach(n => {
-    ctx.fillStyle = C.bright
-    ctx.font = `13px ${MF}`
-    ctx.letterSpacing = '0'
-    ctx.fillText('✓', 16, ly)
-    ctx.fillStyle = C.text
-    ctx.fillText(n, 32, ly)
-    ly += 24
-  })
-
-  // Right: exceptions
-  const rx = W / 2 + 8
-  ctx.fillStyle = C.mid
-  ctx.font = `bold 11px ${MF}`
-  ctx.letterSpacing = '0.12em'
-  ctx.fillText('REQUIRES ATTENTION', rx, 48)
-  ctx.fillStyle = C.border
-  ctx.fillRect(rx, 60, colW, 1)
-
-  const exceptions = s.publish.attention
-  let ry = 66
-  if (exceptions.length === 0) {
-    ctx.fillStyle = C.bright
-    ctx.font = `13px ${MF}`
-    ctx.letterSpacing = '0'
-    ctx.fillText('✓  NONE', rx, ry)
-    ctx.fillStyle = C.sub
-    ctx.font = `11px ${MF}`
-    ctx.fillText('Plan is fully staffed', rx, ry + 16)
-  } else {
-    exceptions.forEach(e => {
-      ctx.fillStyle = C.bright
-      ctx.font = `13px ${MF}`
-      ctx.letterSpacing = '0'
-      ctx.fillText('⚠', rx, ry)
-      ctx.fillStyle = C.bright
-      ctx.font = `bold 13px ${MF}`
-      ctx.fillText(e.flight, rx + 14, ry)
-      ctx.fillStyle = C.sub
-      ctx.font = `11px ${MF}`
-      ctx.fillText(e.note, rx + 14, ry + 16)
-      ry += 38
-    })
-  }
-
-  // Reference + timestamp
-  ctx.fillStyle = C.border
-  ctx.fillRect(16, H - 80, W - 32, 1)
-
-  ctx.fillStyle = C.mid
-  ctx.font = `11px ${MF}`
-  ctx.letterSpacing = '0.04em'
-  ctx.fillText(`REF  OPT-${s.id}-${fmtDateCompact()}-GOI`, 16, H - 70)
-  ctx.fillText(`${fmtDateLong()}  ·  ${fmtTimeUTC()}`, 16, H - 54)
-
-  // CTA — outline only
-  if (published) {
-    ctx.strokeStyle = C.mid
-    ctx.lineWidth = 2
-    ctx.strokeRect(0.5, H - 37.5, W - 1, 37)
-    ctx.fillStyle = C.bright
-    ctx.font = `bold 14px ${MF}`
-    ctx.letterSpacing = '0.1em'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('PUBLISHED  ✓  DOUBLE-TAP TO EXIT', W / 2, H - 19)
-  } else {
-    ctx.strokeStyle = C.bright
-    ctx.lineWidth = 2
-    ctx.strokeRect(0.5, H - 37.5, W - 1, 37)
-    ctx.fillStyle = C.bright
-    ctx.font = `bold 15px ${MF}`
-    ctx.letterSpacing = '0.12em'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('TAP  →  CONFIRM & PUBLISH', W / 2, H - 19)
-  }
-  ctx.textAlign = 'left'
-}
-
-function drawDone(ctx: CanvasRenderingContext2D) {
-  const W = DW, H = DH
-  const s = STRATEGIES[strategyIdx]
-  ctx.fillStyle = C.bg
-  ctx.fillRect(0, 0, W, H)
-
-  // Large check
-  ctx.fillStyle = C.bright
-  ctx.font = `bold 56px ${MF}`
-  ctx.letterSpacing = '0'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('✓', W / 2, 66)
-
-  ctx.font = `bold 22px ${MF}`
-  ctx.letterSpacing = '0.06em'
-  ctx.fillText('PLAN PUBLISHED', W / 2, 116)
-
-  ctx.fillStyle = C.border
-  ctx.fillRect(W / 2 - 120, 132, 240, 1)
-
-  ctx.fillStyle = C.text
-  ctx.font = `13px ${MF}`
-  ctx.letterSpacing = '0.02em'
-  ctx.fillText(`OPT-${s.id}-${fmtDateCompact()}-GOI`, W / 2, 150)
-
-  const stats2 = s.done.stats
-  ctx.fillStyle = C.sub
-  ctx.font = `12px ${MF}`
-  ctx.letterSpacing = '0'
-  stats2.forEach((l, i) => ctx.fillText(l, W / 2, 174 + i * 20))
-
-  ctx.fillStyle = C.border
-  ctx.fillRect(W / 2 - 120, H - 50, 240, 1)
-
-  ctx.fillStyle = C.mid
-  ctx.font = `11px ${MF}`
-  ctx.letterSpacing = '0.08em'
-  ctx.fillText('DOUBLE-TAP TO EXIT', W / 2, H - 26)
-
-  ctx.textAlign = 'left'
-}
 
 // ─── Render pipeline ───────────────────────────────────────────────────────
 
@@ -885,17 +33,20 @@ function makeCanvas(): HTMLCanvasElement {
   return c
 }
 
+// Mapping of screen name → its drawing function
+const DRAWERS: Record<typeof state.screen, (ctx: CanvasRenderingContext2D) => void> = {
+  HOME:       drawHome,
+  OPTIONS:    drawOptions,
+  COMPARISON: drawComparison,
+  REVIEW:     drawReview,
+  PUBLISH:    drawPublish,
+  DONE:       drawDone,
+}
+
 function drawCurrentScreen(): HTMLCanvasElement {
   const c = makeCanvas()
   const ctx = c.getContext('2d')!
-  switch (screen) {
-    case 'HOME':       drawHome(ctx);       break
-    case 'OPTIONS':    drawOptions(ctx);    break
-    case 'COMPARISON': drawComparison(ctx); break
-    case 'REVIEW':     drawReview(ctx);     break
-    case 'PUBLISH':    drawPublish(ctx);    break
-    case 'DONE':       drawDone(ctx);       break
-  }
+  DRAWERS[state.screen](ctx)
   return c
 }
 
@@ -959,59 +110,59 @@ await render()
 
 // ─── Interaction handlers ──────────────────────────────────────────────────
 function handleTap() {
-  switch (screen) {
-    case 'HOME':       screen = 'OPTIONS';    strategyIdx = 0; break
-    case 'OPTIONS':    screen = 'COMPARISON'; compScroll = 0; break
-    case 'COMPARISON': screen = 'REVIEW';     exScroll = 0; break
-    case 'REVIEW':     screen = 'PUBLISH';    break
-    case 'PUBLISH':    if (!published) { published = true; screen = 'DONE' } break
+  switch (state.screen) {
+    case 'HOME':       state.screen = 'OPTIONS';    state.strategyIdx = 0; break
+    case 'OPTIONS':    state.screen = 'COMPARISON'; state.compScroll = 0; break
+    case 'COMPARISON': state.screen = 'REVIEW';     state.exScroll = 0; break
+    case 'REVIEW':     state.screen = 'PUBLISH';    break
+    case 'PUBLISH':    if (!state.published) { state.published = true; state.screen = 'DONE' } break
     case 'DONE': break
   }
   render().catch(console.error)
 }
 
 function handleDoubleTap() {
-  switch (screen) {
+  switch (state.screen) {
     case 'HOME':
       bridge.shutDownPageContainer(1)
       cleanup()
       return
-    case 'OPTIONS':    screen = 'HOME';       break
-    case 'COMPARISON': screen = 'OPTIONS';    break
-    case 'REVIEW':     screen = 'COMPARISON'; break
-    case 'PUBLISH':    screen = 'REVIEW';     break
-    case 'DONE':       screen = 'HOME'; published = false; break
+    case 'OPTIONS':    state.screen = 'HOME';       break
+    case 'COMPARISON': state.screen = 'OPTIONS';    break
+    case 'REVIEW':     state.screen = 'COMPARISON'; break
+    case 'PUBLISH':    state.screen = 'REVIEW';     break
+    case 'DONE':       state.screen = 'HOME'; state.published = false; break
   }
   render().catch(console.error)
 }
 
 function handleScrollUp() {
-  if (screen === 'OPTIONS' && strategyIdx > 0) {
-    strategyIdx--
+  if (state.screen === 'OPTIONS' && state.strategyIdx > 0) {
+    state.strategyIdx--
     render().catch(console.error)
-  } else if (screen === 'COMPARISON' && compScroll > 0) {
-    compScroll = Math.max(0, compScroll - 46)
+  } else if (state.screen === 'COMPARISON' && state.compScroll > 0) {
+    state.compScroll = Math.max(0, state.compScroll - 46)
     render().catch(console.error)
-  } else if (screen === 'REVIEW' && exScroll > 0) {
-    exScroll = Math.max(0, exScroll - 93)
+  } else if (state.screen === 'REVIEW' && state.exScroll > 0) {
+    state.exScroll = Math.max(0, state.exScroll - 93)
     render().catch(console.error)
   }
 }
 
 function handleScrollDown() {
-  if (screen === 'OPTIONS' && strategyIdx < STRATEGIES.length - 1) {
-    strategyIdx++
+  if (state.screen === 'OPTIONS' && state.strategyIdx < STRATEGIES.length - 1) {
+    state.strategyIdx++
     render().catch(console.error)
-  } else if (screen === 'COMPARISON') {
+  } else if (state.screen === 'COMPARISON') {
     const maxOffset = comparisonMaxScroll()
-    if (compScroll < maxOffset) {
-      compScroll = Math.min(maxOffset, compScroll + 46)
+    if (state.compScroll < maxOffset) {
+      state.compScroll = Math.min(maxOffset, state.compScroll + 46)
       render().catch(console.error)
     }
-  } else if (screen === 'REVIEW') {
+  } else if (state.screen === 'REVIEW') {
     const maxOffset = reviewMaxScroll()
-    if (exScroll < maxOffset) {
-      exScroll = Math.min(maxOffset, exScroll + 93)
+    if (state.exScroll < maxOffset) {
+      state.exScroll = Math.min(maxOffset, state.exScroll + 93)
       render().catch(console.error)
     }
   }
@@ -1058,7 +209,7 @@ const unsubscribe = bridge.onEvenHubEvent(event => {
 window.addEventListener('beforeunload', cleanup)
 
 // ─── Companion web UI ──────────────────────────────────────────────────────
-const STEPS: Screen[] = ['HOME', 'OPTIONS', 'COMPARISON', 'REVIEW', 'PUBLISH', 'DONE']
+const STEPS: typeof state.screen[] = ['HOME', 'OPTIONS', 'COMPARISON', 'REVIEW', 'PUBLISH', 'DONE']
 
 const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
@@ -1157,12 +308,12 @@ function mirrorCompanion() {
   const stepper = document.getElementById('stepper')     as HTMLElement | null
   if (!badge || !dispImg || !stepper) return
 
-  badge.textContent = screen
+  badge.textContent = state.screen
 
   // Render full canvas and encode via UPNG for the companion preview
   dispImg.src = toPngUrl(drawCurrentScreen())
 
-  const activeIdx = STEPS.indexOf(screen)
+  const activeIdx = STEPS.indexOf(state.screen)
   stepper.innerHTML = STEPS.map((s, i) => {
     const cls = i < activeIdx ? 'step done' : i === activeIdx ? 'step active' : 'step'
     const dot = i < activeIdx ? '✓' : `${i + 1}`
