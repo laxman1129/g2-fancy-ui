@@ -54,13 +54,9 @@ export interface Strategy {
   publish: {
     notified: string[]
     attention: { flight: string; note: string }[]
-    ref: string
-    timestamp: string
   }
 
   done: {
-    ref: string
-    paxNotified: string
     stats: string[]
     attention: string
   }
@@ -120,12 +116,8 @@ export const STRATEGIES: Strategy[] = [
         'GDS & codeshare feeds',
       ],
       attention: [],
-      ref: 'OPT-A-20260917-GOI',
-      timestamp: '17 SEP 2026  ·  23:14 UTC',
     },
     done: {
-      ref: 'OPT-A-20260917-GOI',
-      paxNotified: '1,947 PAX notified',
       stats: [
         '1,947 PAX notified',
         'Crew scheduling updated',
@@ -202,12 +194,8 @@ export const STRATEGIES: Strategy[] = [
         { flight: 'A1410', note: 'Manual crew review' },
         { flight: 'A1771', note: 'Crew assignment TBC' },
       ],
-      ref: 'OPT-B-20260917-GOI',
-      timestamp: '17 SEP 2026  ·  23:14 UTC',
     },
     done: {
-      ref: 'OPT-B-20260917-GOI',
-      paxNotified: '1,813 PAX notified',
       stats: [
         '1,813 PAX notified',
         'Crew scheduling updated',
@@ -283,12 +271,8 @@ export const STRATEGIES: Strategy[] = [
         { flight: 'A1410', note: 'Manual crew review' },
         { flight: 'A1521', note: 'Crew legality review' },
       ],
-      ref: 'OPT-C-20260917-GOI',
-      timestamp: '17 SEP 2026  ·  23:14 UTC',
     },
     done: {
-      ref: 'OPT-C-20260917-GOI',
-      paxNotified: '2,054 PAX notified',
       stats: [
         '2,054 PAX notified',
         'Hotel vouchers issued (86)',
@@ -370,12 +354,8 @@ export const STRATEGIES: Strategy[] = [
         { flight: 'A1771', note: 'Crew assignment TBC' },
         { flight: 'A1934', note: 'Crew assignment TBC' },
       ],
-      ref: 'OPT-D-20260917-GOI',
-      timestamp: '17 SEP 2026  ·  23:14 UTC',
     },
     done: {
-      ref: 'OPT-D-20260917-GOI',
-      paxNotified: '1,519 PAX notified',
       stats: [
         '1,519 PAX notified',
         'Crew scheduling updated',

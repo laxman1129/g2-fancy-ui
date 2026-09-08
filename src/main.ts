@@ -33,6 +33,60 @@ let published   = false
 let compScroll  = 0
 let exScroll    = 0
 
+// ─── Random disruption scenario (generated once on load) ───────────────────
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+function pad2(n: number): string { return String(n).padStart(2, '0') }
+
+interface Scenario {
+  flights: number
+  pax: number
+  delay: string      // display like "+14h 20m"
+  curfew: string     // display like "02:00 – 06:00"
+  cancels: number
+}
+
+function makeScenario(): Scenario {
+  const flights = randInt(25, 70)
+  const pax     = randInt(750, 7500)
+  const h       = randInt(3, 30)
+  const m       = [0, 10, 15, 20, 30, 40, 45, 50][randInt(0, 7)]
+  const gap     = randInt(3, 18)
+  const startH  = randInt(0, 24 - gap)   // keep window within a single day
+  const cancels = randInt(2, Math.max(3, Math.round(flights * 0.1)))
+  return {
+    flights,
+    pax,
+    delay: `+${h}h ${pad2(m)}m`,
+    curfew: `${pad2(startH)}:00 – ${pad2(startH + gap)}:00`,
+    cancels,
+  }
+}
+
+const SCENARIO: Scenario = makeScenario()
+
+// ─── Current date/time helpers ─────────────────────────────────────────────
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
+
+function fmtDateLong(d: Date = new Date()): string {
+  return `${pad2(d.getUTCDate())} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`
+}
+
+function fmtDateShort(d: Date = new Date()): string {
+  const m = MONTHS[d.getUTCMonth()]
+  return `${pad2(d.getUTCDate())} ${m.charAt(0)}${m.slice(1, 3).toLowerCase()}`
+}
+
+function fmtDateCompact(d: Date = new Date()): string {
+  return `${d.getUTCFullYear()}${pad2(d.getUTCMonth() + 1)}${pad2(d.getUTCDate())}`
+}
+
+function fmtTimeUTC(d: Date = new Date()): string {
+  return `${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} UTC`
+}
+
 // ─── Event capture ─────────────────────────────────────────────────────────
 // The G2 firmware allows only ONE event-capturing container per page, so a
 // single full-screen invisible text container receives every ring gesture.
@@ -142,13 +196,13 @@ function drawHome(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = C.sub
   ctx.font = `12px ${MF}`
   ctx.letterSpacing = '0.04em'
-  ctx.fillText('17 SEP 2026  ·  GOI HUB  ·  STORM CELL MC-47', 16, 33)
+  ctx.fillText(`${fmtDateLong()}  ·  GOI HUB  ·  STORM CELL MC-47`, 16, 33)
 
   // Three large stat boxes
   const stats = [
-    { val: '47',     label: 'FLIGHTS\nIMPACTED' },
-    { val: '2,140',  label: 'PAX\nAFFECTED' },
-    { val: '+4h 20m',label: 'AVG\nDELAY' },
+    { val: String(SCENARIO.flights), label: 'FLIGHTS\nIMPACTED' },
+    { val: SCENARIO.pax.toLocaleString(), label: 'PAX\nAFFECTED' },
+    { val: SCENARIO.delay, label: 'AVG\nDELAY' },
   ]
   const bw = Math.floor((W - 48) / 3)
   stats.forEach((s, i) => {
@@ -184,12 +238,12 @@ function drawHome(ctx: CanvasRenderingContext2D) {
   ctx.font = `bold 13px ${MF}`
   ctx.letterSpacing = '0.02em'
   ctx.textBaseline = 'top'
-  ctx.fillText('3 cancellations', 16, 166)
+  ctx.fillText(`${SCENARIO.cancels} cancellations`, 16, 166)
   ctx.fillText('4 recovery strategies ready', 16, 184)
 
   ctx.fillStyle = C.sub
   ctx.font = `12px ${MF}`
-  ctx.fillText(`Curfew window  02:00 – 06:00 UTC`, 16, 202)
+  ctx.fillText(`Curfew window  ${SCENARIO.curfew} UTC`, 16, 202)
   ctx.fillStyle = C.sub
   ctx.fillText(`Optimizer ready  ·  Delay recover  –34h`, 16, 220)
 
@@ -752,8 +806,8 @@ function drawPublish(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = C.mid
   ctx.font = `11px ${MF}`
   ctx.letterSpacing = '0.04em'
-  ctx.fillText(`REF  ${s.publish.ref}`, 16, H - 70)
-  ctx.fillText(s.publish.timestamp, 16, H - 54)
+  ctx.fillText(`REF  OPT-${s.id}-${fmtDateCompact()}-GOI`, 16, H - 70)
+  ctx.fillText(`${fmtDateLong()}  ·  ${fmtTimeUTC()}`, 16, H - 54)
 
   // CTA — outline only
   if (published) {
@@ -804,7 +858,7 @@ function drawDone(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = C.text
   ctx.font = `13px ${MF}`
   ctx.letterSpacing = '0.02em'
-  ctx.fillText(s.done.ref, W / 2, 150)
+  ctx.fillText(`OPT-${s.id}-${fmtDateCompact()}-GOI`, W / 2, 150)
 
   const stats2 = s.done.stats
   ctx.fillStyle = C.sub
@@ -1015,7 +1069,7 @@ app.innerHTML = `
       <span class="comp-logo-text">Disruption Optimizer</span>
     </div>
     <div class="comp-meta">
-      <span class="comp-date">17 Sep 2026  ·  GOI</span>
+      <span class="comp-date" id="compDate">— · GOI</span>
       <span class="comp-badge" id="screenBadge">HOME</span>
     </div>
   </header>
@@ -1087,6 +1141,9 @@ style.textContent = `
   .comp-hint { text-align:center; font-size:11px; color:#1E2D3D; letter-spacing:.02em; }
 `
 document.head.appendChild(style)
+
+const compDate = document.getElementById('compDate')
+if (compDate) compDate.textContent = `${fmtDateShort()} ${new Date().getUTCFullYear()}  ·  GOI`
 
 document.getElementById('btnTap')!   .addEventListener('click', handleTap)
 document.getElementById('btnDouble')!.addEventListener('click', handleDoubleTap)
