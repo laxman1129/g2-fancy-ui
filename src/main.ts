@@ -130,14 +130,14 @@ function drawHome(ctx: CanvasRenderingContext2D) {
 
   // Alert tag
   ctx.fillStyle = C.bright
-  ctx.font = `bold 12px ${MF}`
+  ctx.font = `bold 13px ${MF}`
   ctx.letterSpacing = '0.14em'
   ctx.textBaseline = 'middle'
   ctx.fillText('▸ DISRUPTION ALERT', 16, 16)
 
   // Date / hub / event
   ctx.fillStyle = C.sub
-  ctx.font = `11px ${MF}`
+  ctx.font = `12px ${MF}`
   ctx.letterSpacing = '0.04em'
   ctx.fillText('17 SEP 2026  ·  GOI HUB  ·  STORM CELL MC-47', 16, 33)
 
@@ -154,20 +154,20 @@ function drawHome(ctx: CanvasRenderingContext2D) {
 
     ctx.strokeStyle = C.bright
     ctx.lineWidth = 1
-    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 89)
+    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, 91)
 
     ctx.fillStyle = C.bright
-    ctx.font      = `bold 32px ${MF}`
+    ctx.font      = `bold 34px ${MF}`
     ctx.letterSpacing = '-0.02em'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(s.val, bx + bw / 2, by + 36)
+    ctx.fillText(s.val, bx + bw / 2, by + 38)
 
     ctx.fillStyle = C.sub
-    ctx.font = `10px ${MF}`
+    ctx.font = `11px ${MF}`
     ctx.letterSpacing = '0.08em'
     const lines = s.label.split('\n')
-    lines.forEach((l, li) => ctx.fillText(l, bx + bw / 2, by + 60 + li * 14))
+    lines.forEach((l, li) => ctx.fillText(l, bx + bw / 2, by + 62 + li * 15))
   })
 
   ctx.textAlign = 'left'
@@ -177,17 +177,18 @@ function drawHome(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = C.dim
   ctx.fillRect(16, 158, W - 32, 1)
 
-  ctx.fillStyle = C.sub
-  ctx.font = `11px ${MF}`
+  ctx.fillStyle = C.bright
+  ctx.font = `bold 13px ${MF}`
   ctx.letterSpacing = '0.02em'
   ctx.textBaseline = 'top'
   ctx.fillText('3 cancellations', 16, 166)
-  ctx.fillText('4 recovery strategies ready', 16, 182)
+  ctx.fillText('4 recovery strategies ready', 16, 184)
 
-  ctx.fillStyle = C.muted
-  ctx.font = `11px ${MF}`
-  ctx.fillText(`Curfew window  02:00 – 06:00 UTC`, 16, 198)
-  ctx.fillText(`Optimizer ready  ·  Avg delay recoverable  –34h`, 16, 214)
+  ctx.fillStyle = C.sub
+  ctx.font = `12px ${MF}`
+  ctx.fillText(`Curfew window  02:00 – 06:00 UTC`, 16, 202)
+  ctx.fillStyle = C.sub
+  ctx.fillText(`Optimizer ready  ·  Delay recover  –34h`, 16, 220)
 
   // CTA bar
   ctx.strokeStyle = C.bright
@@ -215,7 +216,7 @@ function drawOptions(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = C.border
   ctx.fillRect(0, 34, W, 1)
   ctx.fillStyle = C.text
-  ctx.font = `bold 11px ${MF}`
+  ctx.font = `bold 12px ${MF}`
   ctx.letterSpacing = '0.12em'
   ctx.textBaseline = 'middle'
   ctx.fillText('SELECT RECOVERY STRATEGY', 16, 17)
@@ -230,23 +231,20 @@ function drawOptions(ctx: CanvasRenderingContext2D) {
     const cx = i * cw
     const sel = i === strategyIdx
 
-    // Card — outline only; selected card gets a bold bright outline
+    // Card frame — selected card gets a bold bright outline
     ctx.strokeStyle = sel ? C.bright : C.border
     ctx.lineWidth = sel ? 3 : 1
     ctx.strokeRect(cx + 1.5, 36.5, cw - 4, H - 38)
 
-    // Vertical divider
-    ctx.fillStyle = C.border
-    ctx.fillRect(cx + cw - 1, 35, 1, H - 35)
+    // Header strip divider (top of each card)
+    ctx.fillStyle = sel ? C.bright : C.border
+    ctx.fillRect(cx + 2, 61, cw - 4, 1)
 
-    const tx = cx + 10
-    const baseColor = C.bright
-
-    // ID badge — outline only
+    // ── Top row: ID badge + recommended star ──
     ctx.strokeStyle = sel ? C.bright : C.mid
     ctx.lineWidth = 1
     ctx.strokeRect(cx + 8.5, 42.5, 27, 17)
-    ctx.fillStyle = baseColor
+    ctx.fillStyle = sel ? C.bright : C.text
     ctx.font = `bold 12px ${MF}`
     ctx.letterSpacing = '0'
     ctx.textBaseline = 'middle'
@@ -256,13 +254,16 @@ function drawOptions(ctx: CanvasRenderingContext2D) {
 
     if (s.recommended) {
       ctx.fillStyle = C.bright
-      ctx.font = `12px ${MF}`
-      ctx.fillText('★', cx + cw - 20, 51)
+      ctx.font = `13px ${MF}`
+      ctx.fillText('★', cx + cw - 20, 48)
+      ctx.font = `8px ${MF}`
+      ctx.letterSpacing = '0.06em'
+      ctx.fillText('BEST', cx + cw - 20, 58)
     }
 
-    // Name (may wrap)
-    ctx.fillStyle = baseColor
-    ctx.font = `bold 12px ${MF}`
+    // ── Name ──
+    ctx.fillStyle = sel ? C.bright : C.text
+    ctx.font = `bold 14px ${MF}`
     ctx.letterSpacing = '0'
     ctx.textBaseline = 'top'
     const words = s.name.split(' ')
@@ -271,14 +272,14 @@ function drawOptions(ctx: CanvasRenderingContext2D) {
     for (const w of words) {
       const test = line ? `${line} ${w}` : w
       if (ctx.measureText(test).width > cw - 20 && line) {
-        ctx.fillText(line, tx, ly); ly += 16; line = w
+        ctx.fillText(line, cx + 10, ly); ly += 17; line = w
       } else { line = test }
     }
-    if (line) ctx.fillText(line, tx, ly)
-    ly += 20
+    if (line) ctx.fillText(line, cx + 10, ly)
 
-    // Summary
-    ctx.fillStyle = C.mid
+    // ── Summary ──
+    ly += 22
+    ctx.fillStyle = sel ? C.sub : C.mid
     ctx.font = `10px ${MF}`
     ctx.letterSpacing = '0.02em'
     const sumWords = s.summary.split(' ')
@@ -286,35 +287,60 @@ function drawOptions(ctx: CanvasRenderingContext2D) {
     for (const w of sumWords) {
       const test = sline ? `${sline} ${w}` : w
       if (ctx.measureText(test).width > cw - 20 && sline) {
-        ctx.fillText(sline, tx, ly); ly += 14; sline = w
+        ctx.fillText(sline, cx + 10, ly); ly += 14; sline = w
       } else { sline = test }
     }
-    if (sline) ctx.fillText(sline, tx, ly)
-    ly += 20
+    if (sline) ctx.fillText(sline, cx + 10, ly)
 
-    // Cost
-    ctx.fillStyle = C.bright
-    ctx.font = `bold 11px ${MF}`
+    // ── Cost — amount + "vs …" on two centered lines ──
+    ly += 26
+    ctx.fillStyle = C.bg3
+    ctx.fillRect(cx + 10, ly - 6, cw - 20, 1)
+    ctx.fillStyle = sel ? C.bright : C.text
+    ctx.font = `bold 15px ${MF}`
     ctx.letterSpacing = '0'
-    ctx.fillText(s.cost, tx, ly); ly += 16
+    ctx.textAlign = 'center'
+    const costParts = s.cost.split(' vs ')
+    ctx.textBaseline = 'top'
+    ctx.fillText(costParts[0], cx + cw / 2, ly)
+    if (costParts[1]) {
+      ctx.font = `10px ${MF}`
+      ctx.fillStyle = sel ? C.bright : C.mid
+      ctx.fillText(`vs ${costParts[1]}`, cx + cw / 2, ly + 17)
+      ly += 33
+    } else {
+      ly += 17
+    }
+    ctx.textAlign = 'left'
 
-    // PAX bar — outline + single fill line
-    ctx.strokeStyle = C.mid
+    // ── PAX section ──
+    ly += 4
+    ctx.fillStyle = sel ? C.bright : C.mid
+    ctx.font = `9px ${MF}`
+    ctx.letterSpacing = '0.06em'
+    ctx.fillText('PAX COVERED', cx + 8, ly)
+    ctx.textAlign = 'right'
+    ctx.fillStyle = sel ? C.bright : C.text
+    ctx.font = `bold 13px ${MF}`
+    ctx.fillText(`${s.paxPct}%`, cx + cw - 8, ly - 2)
+    ctx.textAlign = 'left'
+    ly += 13
+
+    // PAX bar
+    ctx.strokeStyle = sel ? C.bright : C.mid
     ctx.lineWidth = 1
     ctx.strokeRect(cx + 8.5, ly + 0.5, cw - 18, 5)
-    ctx.fillStyle = C.bright
+    ctx.fillStyle = sel ? C.bright : C.text
     ctx.fillRect(cx + 8, ly + 2, Math.floor((cw - 18) * s.paxPct / 100), 1)
-    ly += 11
+    ly += 12
 
-    ctx.fillStyle = C.mid
+    // ── Exceptions / open footer ──
+    ly += 8
+    ctx.fillStyle = sel ? C.bright : C.sub
     ctx.font = `10px ${MF}`
-    ctx.fillText(`PAX ${s.paxPct}%`, tx, ly); ly += 14
-
-    // Exceptions / open
-    const excCol = C.mid
-    ctx.fillStyle = excCol
-    ctx.font = `10px ${MF}`
-    ctx.fillText(`${s.exceptions} excep  ${s.open} open`, tx, ly)
+    ctx.letterSpacing = '0'
+    ctx.textBaseline = 'top'
+    ctx.fillText(`${s.exceptions} EXCEP  ·  ${s.open} OPEN`, cx + 8, ly)
   })
 }
 
@@ -332,7 +358,7 @@ function drawComparison(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = C.border
   ctx.fillRect(0, 30, W, 1)
   ctx.fillStyle = C.text
-  ctx.font = `bold 11px ${MF}`
+  ctx.font = `bold 12px ${MF}`
   ctx.letterSpacing = '0.1em'
   ctx.textBaseline = 'middle'
   ctx.fillText(`FLIGHT COMPARISON  ·  STRATEGY ${s.id}  ·  ${s.name.toUpperCase()}`, 14, 15)
@@ -340,7 +366,7 @@ function drawComparison(ctx: CanvasRenderingContext2D) {
   // Column headers
   const cols = { icon: 14, flight: 30, route: 96, doNothing: 186, arrow: 322, proposed: 342, status: 498 }
   ctx.fillStyle = C.mid
-  ctx.font = `10px ${MF}`
+  ctx.font = `11px ${MF}`
   ctx.letterSpacing = '0.08em'
   ctx.textBaseline = 'middle'
   ctx.fillText('FLT',      cols.flight, 42)
@@ -351,8 +377,8 @@ function drawComparison(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = C.border
   ctx.fillRect(0, 48, W, 1)
 
-  // Flight rows
-  const rowH = 22
+    // Flight rows
+  const rowH = 23
   let y = 50
   FLIGHTS.forEach(f => {
     if (y + rowH > H) return
@@ -365,29 +391,29 @@ function drawComparison(ctx: CanvasRenderingContext2D) {
 
     // Status icon
     ctx.fillStyle = f.ok ? C.mid : C.bright
-    ctx.font = `bold 11px ${MF}`
+    ctx.font = `bold 13px ${MF}`
     ctx.letterSpacing = '0'
     ctx.textBaseline = 'middle'
     ctx.fillText(f.ok ? '✓' : '⚠', cols.icon, ym)
 
     // Flight
     ctx.fillStyle = C.bright
-    ctx.font = `bold 11px ${MF}`
+    ctx.font = `bold 13px ${MF}`
     ctx.fillText(f.flight, cols.flight, ym)
 
     // Route
     ctx.fillStyle = C.sub
-    ctx.font = `10px ${MF}`
+    ctx.font = `11px ${MF}`
     ctx.fillText(f.route, cols.route, ym)
 
     // Do-Nothing
     ctx.fillStyle = f.doNothing.includes('CANCEL') ? C.mid : C.sub
-    ctx.font = `11px ${MF}`
+    ctx.font = `12px ${MF}`
     ctx.fillText(f.doNothing.trim(), cols.doNothing, ym)
 
     // Arrow
     ctx.fillStyle = C.mid
-    ctx.font = `10px ${MF}`
+    ctx.font = `12px ${MF}`
     ctx.fillText('→', cols.arrow, ym)
 
     // Proposed
@@ -395,13 +421,13 @@ function drawComparison(ctx: CanvasRenderingContext2D) {
                  : f.proposed.trim() === 'ON TIME' ? C.bright
                  : C.text
     ctx.fillStyle = pColor
-    ctx.font = `bold 11px ${MF}`
+    ctx.font = `bold 13px ${MF}`
     ctx.fillText(f.proposed.trim(), cols.proposed, ym)
 
     // Note (right edge)
     if (f.note) {
       ctx.fillStyle = C.mid
-      ctx.font = `9px ${MF}`
+      ctx.font = `10px ${MF}`
       ctx.letterSpacing = '0.04em'
       const noteW = ctx.measureText(f.note).width
       ctx.fillText(f.note, W - noteW - 10, ym)
@@ -430,7 +456,7 @@ function drawReview(ctx: CanvasRenderingContext2D) {
 
   // Section label
   ctx.fillStyle = C.mid
-  ctx.font = `bold 10px ${MF}`
+  ctx.font = `bold 11px ${MF}`
   ctx.letterSpacing = '0.12em'
   ctx.textBaseline = 'top'
   ctx.fillText('STRATEGY B · OUTCOME SUMMARY', 14, 12)
@@ -441,31 +467,31 @@ function drawReview(ctx: CanvasRenderingContext2D) {
   // Three stacked big-number metrics
   const metrics = [
     { val: '↓ $198k', sub: 'COST SAVED VS DO-NOTHING', y: 34 },
-    { val: '−34h',    sub: 'TOTAL DELAY RECOVERED',    y: 100 },
-    { val: '84%',     sub: 'PAX RESOLVED · 1,813 / 2,140', y: 166 },
+    { val: '−34h',    sub: 'TOTAL DELAY RECOVERED',    y: 102 },
+    { val: '84%',     sub: 'PAX RESOLVED · 1,813 / 2,140', y: 170 },
   ]
 
   metrics.forEach(m => {
     ctx.fillStyle = C.bright
-    ctx.font      = `bold 34px ${MF}`
+    ctx.font      = `bold 38px ${MF}`
     ctx.letterSpacing = '-0.02em'
     ctx.textBaseline = 'top'
     ctx.fillText(m.val, 14, m.y)
 
     ctx.fillStyle = C.sub
-    ctx.font      = `10px ${MF}`
+    ctx.font      = `11px ${MF}`
     ctx.letterSpacing = '0.06em'
-    ctx.fillText(m.sub, 14, m.y + 40)
+    ctx.fillText(m.sub, 14, m.y + 44)
 
     ctx.fillStyle = C.bg3
-    ctx.fillRect(14, m.y + 56, lw - 28, 1)
+    ctx.fillRect(14, m.y + 60, lw - 28, 1)
   })
 
   // Est. completion
   ctx.fillStyle = C.muted
-  ctx.font = `10px ${MF}`
+  ctx.font = `11px ${MF}`
   ctx.letterSpacing = '0.04em'
-  ctx.fillText('Est. completion  03:40 UTC', 14, 238)
+  ctx.fillText('Est. completion  03:40 UTC', 14, 242)
 
   // Vertical divider
   ctx.fillStyle = C.border
@@ -475,7 +501,7 @@ function drawReview(ctx: CanvasRenderingContext2D) {
   const rx = lw + 1
 
   ctx.fillStyle = C.mid
-  ctx.font = `bold 10px ${MF}`
+  ctx.font = `bold 11px ${MF}`
   ctx.letterSpacing = '0.12em'
   ctx.textBaseline = 'top'
   ctx.fillText('EXCEPTIONS & OPEN ITEMS', rx + 13, 12)
@@ -501,30 +527,30 @@ function drawReview(ctx: CanvasRenderingContext2D) {
     // Badge — outline only
     ctx.strokeStyle = C.mid
     ctx.lineWidth = 1
-    ctx.strokeRect(rx + 13.5, ey + 0.5, lw - 29, 14)
+    ctx.strokeRect(rx + 13.5, ey + 0.5, lw - 29, 15)
     ctx.fillStyle = C.sub
-    ctx.font = `bold 9px ${MF}`
+    ctx.font = `bold 10px ${MF}`
     ctx.letterSpacing = '0.1em'
     ctx.textBaseline = 'middle'
-    ctx.fillText(`⚠ ${e.badge}`, rx + 17, ey + 7)
-    ey += 18
+    ctx.fillText(`⚠ ${e.badge}`, rx + 17, ey + 8)
+    ey += 19
 
     ctx.fillStyle = C.bright
-    ctx.font = `bold 18px ${MF}`
+    ctx.font = `bold 20px ${MF}`
     ctx.letterSpacing = '0'
     ctx.textBaseline = 'top'
     ctx.fillText(e.flight, rx + 13, ey)
 
     ctx.fillStyle = C.sub
-    ctx.font = `11px ${MF}`
+    ctx.font = `12px ${MF}`
     ctx.fillText(e.route, rx + 74, ey + 3)
-    ey += 24
+    ey += 26
 
     e.lines.forEach(l => {
       ctx.fillStyle = C.mid
-      ctx.font = `10px ${MF}`
+      ctx.font = `11px ${MF}`
       ctx.fillText(l, rx + 13, ey)
-      ey += 15
+      ey += 16
     })
 
     ctx.fillStyle = C.bg3
@@ -538,7 +564,7 @@ function drawReview(ctx: CanvasRenderingContext2D) {
   ctx.strokeRect(rx + 0.5, H - 38.5, lw - 1, 37)
 
   ctx.fillStyle = C.bright
-  ctx.font = `bold 13px ${MF}`
+  ctx.font = `bold 14px ${MF}`
   ctx.letterSpacing = '0.1em'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -558,7 +584,7 @@ function drawPublish(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = C.border
   ctx.fillRect(0, 38, W, 1)
   ctx.fillStyle = C.bright
-  ctx.font = `bold 15px ${MF}`
+  ctx.font = `bold 16px ${MF}`
   ctx.letterSpacing = '0.08em'
   ctx.textBaseline = 'middle'
   ctx.fillText('PUBLISH PLAN  ·  STRATEGY B', 16, 19)
@@ -568,7 +594,7 @@ function drawPublish(ctx: CanvasRenderingContext2D) {
 
   // Left: notifications sent
   ctx.fillStyle = C.mid
-  ctx.font = `bold 10px ${MF}`
+  ctx.font = `bold 11px ${MF}`
   ctx.letterSpacing = '0.12em'
   ctx.textBaseline = 'top'
   ctx.fillText('SYSTEMS NOTIFIED', 16, 48)
@@ -584,18 +610,18 @@ function drawPublish(ctx: CanvasRenderingContext2D) {
   let ly = 66
   notified.forEach(n => {
     ctx.fillStyle = C.bright
-    ctx.font = `11px ${MF}`
+    ctx.font = `13px ${MF}`
     ctx.letterSpacing = '0'
     ctx.fillText('✓', 16, ly)
     ctx.fillStyle = C.text
     ctx.fillText(n, 32, ly)
-    ly += 21
+    ly += 24
   })
 
   // Right: exceptions
   const rx = W / 2 + 8
   ctx.fillStyle = C.mid
-  ctx.font = `bold 10px ${MF}`
+  ctx.font = `bold 11px ${MF}`
   ctx.letterSpacing = '0.12em'
   ctx.fillText('REQUIRES ATTENTION', rx, 48)
   ctx.fillStyle = C.border
@@ -608,16 +634,16 @@ function drawPublish(ctx: CanvasRenderingContext2D) {
   let ry = 66
   exceptions.forEach(e => {
     ctx.fillStyle = C.bright
-    ctx.font = `11px ${MF}`
+    ctx.font = `13px ${MF}`
     ctx.letterSpacing = '0'
     ctx.fillText('⚠', rx, ry)
     ctx.fillStyle = C.bright
-    ctx.font = `bold 11px ${MF}`
+    ctx.font = `bold 13px ${MF}`
     ctx.fillText(e.flight, rx + 14, ry)
     ctx.fillStyle = C.sub
-    ctx.font = `10px ${MF}`
-    ctx.fillText(e.note, rx + 14, ry + 14)
-    ry += 34
+    ctx.font = `11px ${MF}`
+    ctx.fillText(e.note, rx + 14, ry + 16)
+    ry += 38
   })
 
   // Reference + timestamp
@@ -625,10 +651,10 @@ function drawPublish(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(16, H - 80, W - 32, 1)
 
   ctx.fillStyle = C.mid
-  ctx.font = `10px ${MF}`
+  ctx.font = `11px ${MF}`
   ctx.letterSpacing = '0.04em'
   ctx.fillText('REF  OPT-B-20260917-GOI', 16, H - 70)
-  ctx.fillText('17 SEP 2026  ·  23:14 UTC', 16, H - 56)
+  ctx.fillText('17 SEP 2026  ·  23:14 UTC', 16, H - 54)
 
   // CTA — outline only
   if (published) {
@@ -636,7 +662,7 @@ function drawPublish(ctx: CanvasRenderingContext2D) {
     ctx.lineWidth = 2
     ctx.strokeRect(0.5, H - 37.5, W - 1, 37)
     ctx.fillStyle = C.bright
-    ctx.font = `bold 13px ${MF}`
+    ctx.font = `bold 14px ${MF}`
     ctx.letterSpacing = '0.1em'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -646,7 +672,7 @@ function drawPublish(ctx: CanvasRenderingContext2D) {
     ctx.lineWidth = 2
     ctx.strokeRect(0.5, H - 37.5, W - 1, 37)
     ctx.fillStyle = C.bright
-    ctx.font = `bold 14px ${MF}`
+    ctx.font = `bold 15px ${MF}`
     ctx.letterSpacing = '0.12em'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -662,13 +688,13 @@ function drawDone(ctx: CanvasRenderingContext2D) {
 
   // Large check
   ctx.fillStyle = C.bright
-  ctx.font = `bold 52px ${MF}`
+  ctx.font = `bold 56px ${MF}`
   ctx.letterSpacing = '0'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText('✓', W / 2, 68)
+  ctx.fillText('✓', W / 2, 66)
 
-  ctx.font = `bold 20px ${MF}`
+  ctx.font = `bold 22px ${MF}`
   ctx.letterSpacing = '0.06em'
   ctx.fillText('PLAN PUBLISHED', W / 2, 116)
 
@@ -676,7 +702,7 @@ function drawDone(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(W / 2 - 120, 132, 240, 1)
 
   ctx.fillStyle = C.text
-  ctx.font = `12px ${MF}`
+  ctx.font = `13px ${MF}`
   ctx.letterSpacing = '0.02em'
   ctx.fillText('OPT-B-20260917-GOI', W / 2, 150)
 
@@ -686,15 +712,15 @@ function drawDone(ctx: CanvasRenderingContext2D) {
     'A1410 + A1771 flagged for ops',
   ]
   ctx.fillStyle = C.sub
-  ctx.font = `11px ${MF}`
+  ctx.font = `12px ${MF}`
   ctx.letterSpacing = '0'
-  stats2.forEach((l, i) => ctx.fillText(l, W / 2, 174 + i * 19))
+  stats2.forEach((l, i) => ctx.fillText(l, W / 2, 174 + i * 20))
 
   ctx.fillStyle = C.border
   ctx.fillRect(W / 2 - 120, H - 50, 240, 1)
 
   ctx.fillStyle = C.mid
-  ctx.font = `10px ${MF}`
+  ctx.font = `11px ${MF}`
   ctx.letterSpacing = '0.08em'
   ctx.fillText('DOUBLE-TAP TO EXIT', W / 2, H - 26)
 
@@ -797,7 +823,6 @@ function handleTap() {
 function handleDoubleTap() {
   switch (screen) {
     case 'HOME':
-    case 'DONE':
       bridge.shutDownPageContainer(1)
       cleanup()
       return
@@ -805,6 +830,7 @@ function handleDoubleTap() {
     case 'COMPARISON': screen = 'OPTIONS';    break
     case 'REVIEW':     screen = 'COMPARISON'; break
     case 'PUBLISH':    screen = 'REVIEW';     break
+    case 'DONE':       screen = 'HOME'; published = false; break
   }
   render().catch(console.error)
 }
