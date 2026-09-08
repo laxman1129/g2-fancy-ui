@@ -107,76 +107,102 @@ type SpeechRecognitionLike = {
 
 // ─── Initialise voice control ──────────────────────────────────────────────
 // `dispatch(action)` is called by the engine for every recognized command.
-export function initVoice(
+// Voice is optional — create the controller at boot but do NOT start it; the
+// user enables it via long-press (or the companion toggle / 'v' key).
+export interface VoiceController {
+  start(): void
+  stop(): void
+  toggle(): void
+}
+
+export function createVoice(
   bridge: Bridge,
   dispatch: (action: VoiceAction) => void,
-): { unsubscribe: () => void } {
-  // Open the G2 glasses mic. This streams raw PCM which we use to drive the
-  // live listening meter; speech recognition (where available) uses the phone.
-  bridge.audioControl(true, AudioInputSource.Glasses)
-    .then(ok => { if (!ok) console.warn('audioControl(glasses) failed') })
-    .catch(e => console.warn('audioControl error', e))
-
-  const unsubMicro = bridge.onEvenHubEvent(event => {
-    const audio = event.audioEvent
-    if (!audio || !audio.audioPcm) return
-    driveLevel(audio.audioPcm)
-  })
-
-  // Web Speech API recognizer for keyword recognition (continuous loop).
+): VoiceController {
   let recognition: SpeechRecognitionLike | null = null
-  const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-  if (SR) {
-    voice.supported = true
-    const rec: SpeechRecognitionLike = new SR()
-    rec.lang = 'en-US'
-    rec.continuous = true
-    rec.interimResults = false
-    rec.maxAlternatives = 1
+  let unsubMicro: () => void = () => {}
+  let running = false
 
-    rec.onresult = (e: any) => {
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const res = e.results[i]
-        if (res.isFinal) {
-          const transcript = res[0].transcript
-          voice.lastWord = transcript.trim()
-          const m = matchKeyword(transcript)
-          if (m) {
-            voice.lastAction = m.label
-            voice.since = Date.now()
-            dispatch(m.action)
+  function start() {
+    if (running) return
+    running = true
+    voice.enabled = true
+
+    // Open the G2 glasses mic. This streams raw PCM which we use to drive the
+    // live listening meter; speech recognition (where available) uses the phone.
+    bridge.audioControl(true, AudioInputSource.Glasses)
+      .then(ok => { if (!ok) console.warn('audioControl(glasses) failed') })
+      .catch(e => console.warn('audioControl error', e))
+
+    unsubMicro = bridge.onEvenHubEvent(event => {
+      const audio = event.audioEvent
+      if (!audio || !audio.audioPcm) return
+      driveLevel(audio.audioPcm)
+    })
+
+    // Web Speech API recognizer for keyword recognition (continuous loop).
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (SR) {
+      voice.supported = true
+      const rec: SpeechRecognitionLike = new SR()
+      rec.lang = 'en-US'
+      rec.continuous = true
+      rec.interimResults = false
+      rec.maxAlternatives = 1
+
+      rec.onresult = (e: any) => {
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i]
+          if (res.isFinal) {
+            const transcript = res[0].transcript
+            voice.lastWord = transcript.trim()
+            const m = matchKeyword(transcript)
+            if (m) {
+              voice.lastAction = m.label
+              voice.since = Date.now()
+              dispatch(m.action)
+            }
           }
         }
       }
-    }
-    rec.onerror = (e: any) => {
-      // 'aborted' from restart is expected; other errors just get retried.
-      if (e && e.error && e.error !== 'aborted' && e.error !== 'no-speech') {
-        console.warn('voice recognition error:', e.error)
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-          voice.enabled = false    // permission denied — don't retry in a loop
+      rec.onerror = (e: any) => {
+        // 'aborted' from restart is expected; other errors just get retried.
+        if (e && e.error && e.error !== 'aborted' && e.error !== 'no-speech') {
+          console.warn('voice recognition error:', e.error)
+          if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+            stop()    // permission denied — don't retry in a loop
+          }
         }
       }
-    }
-    rec.onend = () => { if (voice.enabled) { try { rec.start() } catch {} } }
+      rec.onend = () => { if (voice.enabled) { try { rec.start() } catch {} } }
 
-    recognition = rec
-    try { rec.start() } catch {}
-    voice.enabled = true
-  } else {
+      recognition = rec
+      try { rec.start() } catch {}
+    } else {
+      voice.supported = false   // still listen for the level meter only
+    }
+  }
+
+  function stop() {
+    if (!running) return
+    running = false
+    voice.enabled = false
     voice.supported = false
-    voice.enabled = true  // still listen for the level meter
+    voice.listening = false
+    voice.level = 0
+    voice.lastWord = ''
+    voice.lastAction = ''
+    voice.since = 0
+    if (recognition) { try { recognition.stop() } catch {} }
+    recognition = null
+    unsubMicro()
+    bridge.audioControl(false).catch(() => {})
   }
 
   return {
-    unsubscribe() {
-      if (recognition) { try { recognition.stop() } catch {} }
-      if (voice.enabled) {
-        voice.enabled = false
-        bridge.audioControl(false).catch(() => {})
-      }
-      unsubMicro()
-    },
+    start,
+    stop,
+    toggle() { running ? stop() : start() },
   }
 }
 
@@ -213,7 +239,10 @@ export function voiceFeedbackActive(): boolean {
 // ─── On-screen voice status chip (drawn on top of every screen) ────────────
 // A compact, right-aligned indicator so the wearer always knows the mic state
 // and gets brief feedback showing the keyword that was just recognized.
+// Rendered only while voice is enabled — no indicator when it is off.
 export function drawVoiceOverlay(ctx: CanvasRenderingContext2D, d: DrawingContext = { w: 576, h: 288, c: C }) {
+  if (!voice.enabled) return   // disabled → invisible indicator
+
   const W = d.w
   const c = d.c
   const M = 6           // right/top margin

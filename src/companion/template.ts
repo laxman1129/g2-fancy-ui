@@ -27,6 +27,9 @@ export const COMPANION_TEMPLATE = `
     <button class="ctrl-btn ctrl-secondary" id="btnUp">     <span class="ctrl-icon">↑</span><span class="ctrl-label">Scroll up</span></button>
     <button class="ctrl-btn ctrl-secondary" id="btnDown">   <span class="ctrl-icon">↓</span><span class="ctrl-label">Scroll down</span></button>
   </div>
-  <p class="comp-hint">Buttons simulate G2 ring gestures  ·  Voice: ok=tap, back=double-tap, next=scroll up, previous=scroll down · also: options, strategy b, publish, confirm</p>
+  <div class="comp-controls">
+    <button class="ctrl-btn ctrl-voice" id="btnVoice"><span class="ctrl-icon">◉</span><span class="ctrl-label">Voice</span></button>
+  </div>
+  <p class="comp-hint">Buttons simulate G2 ring gestures  ·  Voice (long-press or 'V' to toggle): ok=tap, back=double-tap, next=scroll up, previous=scroll down</p>
 </div>
 `

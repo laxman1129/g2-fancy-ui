@@ -25,6 +25,10 @@ export function mountCompanion(engine: Engine) {
   document.getElementById('btnDouble')!.addEventListener('click', engine.handleDoubleTap)
   document.getElementById('btnUp')!    .addEventListener('click', engine.handleScrollUp)
   document.getElementById('btnDown')!  .addEventListener('click', engine.handleScrollDown)
+  document.getElementById('btnVoice')!.addEventListener('click', engine.toggleVoice)
+  window.addEventListener('keydown', e => {
+    if (e.key.toLowerCase() === 'v' && !e.repeat) engine.toggleVoice()
+  })
 
   mirrorCompanion(engine.drawCurrentScreen)
 }
@@ -40,6 +44,8 @@ export function mirrorCompanion(drawCurrentScreen: () => HTMLCanvasElement) {
   badge.textContent = state.screen
 
   // Live voice-control status for the developer companion
+  const voiceBtn = document.getElementById('btnVoice') as HTMLButtonElement | null
+  if (voiceBtn) voiceBtn.classList.toggle('on', voice.enabled)
   if (voiceLb) {
     voiceLb.textContent =
       !voice.enabled ? 'VOICE OFF'

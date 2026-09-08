@@ -115,14 +115,14 @@ export function drawReview(ctx: CanvasRenderingContext2D, d: DrawingContext = { 
       ey += 19
 
       ctx.fillStyle = d.c.bright
-      ctx.font = `bold 20px ${MF}`
+      ctx.font = `bold 18px ${MF}`
       ctx.letterSpacing = '0'
       ctx.textBaseline = 'top'
       ctx.fillText(e.flight, rx + 13, ey)
 
       ctx.fillStyle = d.c.sub
-      ctx.font = `12px ${MF}`
-      ctx.fillText(e.route, rx + 74, ey + 3)
+      ctx.font = `11px ${MF}`
+      ctx.fillText(e.route, rx + 84, ey + 3)
       ey += 26
 
       e.lines.forEach(l => {

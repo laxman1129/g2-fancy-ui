@@ -39,6 +39,9 @@ export const COMPANION_STYLES = `
   .ctrl-primary:hover { background:linear-gradient(160deg,#1A6CC0,#2280D4); }
   .ctrl-secondary { background:#0C1018; border-color:#1A2535; color:#8BAFC8; }
   .ctrl-secondary:hover { background:#111820; border-color:#253545; color:#A8C4D8; }
+  .ctrl-voice { grid-column:1 / -1; background:#0A0F14; border-color:#2A4A5A; color:#6FA8C8; }
+  .ctrl-voice:hover { background:#0F151C; border-color:#35607A; }
+  .ctrl-voice.on { background:#0D2418; border-color:#2E7D55; color:#7FE0A8; }
   .ctrl-icon { font-size:16px; line-height:1; }
   .ctrl-label { font-size:10px; font-weight:500; letter-spacing:.04em; opacity:.8; }
   .comp-hint { text-align:center; font-size:11px; color:#1E2D3D; letter-spacing:.02em; }

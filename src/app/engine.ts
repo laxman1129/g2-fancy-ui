@@ -8,7 +8,7 @@ import { toGray4 } from '../core/rendering'
 import { STRATEGIES } from '../data/strategies'
 import { DRAWERS, comparisonMaxScroll, reviewMaxScroll } from '../screens'
 import { mirrorCompanion } from '../companion/mirror'
-import { initVoice, drawVoiceOverlay, isStrategySelectRelevant, type VoiceAction } from '../core/voice'
+import { createVoice, drawVoiceOverlay, isStrategySelectRelevant, type VoiceAction, type VoiceController } from '../core/voice'
 import type { Bridge } from './bridge'
 
 export interface Engine {
@@ -18,6 +18,7 @@ export interface Engine {
   handleDoubleTap(): void
   handleScrollUp(): void
   handleScrollDown(): void
+  toggleVoice(): void
 }
 
 export function createEngine(bridge: Bridge): Engine {
@@ -165,7 +166,18 @@ export function createEngine(bridge: Bridge): Engine {
 
   // ─── Lifecycle: device events ────────────────────────────────────────────
   let cleanedUp = false
+
+  // Voice is optional and disabled by default. The controller is created once
+  // at boot (so the mic can be started later) but not started; the user opts
+  // in via a long-press on the ring (or the companion toggle / 'v' key).
+  const voiceCtrl: VoiceController = createVoice(bridge, dispatchVoice)
   let stopVoice: () => void = () => {}
+
+  function toggleVoice() {
+    voiceCtrl.toggle()
+    render().catch(console.error)
+  }
+
   function cleanup() {
     if (cleanedUp) return
     cleanedUp = true
@@ -181,6 +193,12 @@ export function createEngine(bridge: Bridge): Engine {
   const unsubscribe = bridge.onEvenHubEvent(event => {
     const sysType  = eventTypeOf(event.sysEvent)
     const textType = eventTypeOf(event.textEvent)
+
+    // Long press toggles voice control on/off.
+    if (
+      sysType  === OsEventTypeList.LONG_PRESS_EVENT ||
+      textType === OsEventTypeList.LONG_PRESS_EVENT
+    ) { toggleVoice(); return }
 
     if (
       sysType  === OsEventTypeList.DOUBLE_CLICK_EVENT ||
@@ -205,9 +223,7 @@ export function createEngine(bridge: Bridge): Engine {
 
   window.addEventListener('beforeunload', cleanup)
 
-  // Start voice control last — the startup page container already exists, so
-  // the glasses mic can be opened, and keyword dispatch flows in here.
-  stopVoice = initVoice(bridge, dispatchVoice).unsubscribe
+  stopVoice = voiceCtrl.stop
 
-  return { render, drawCurrentScreen, handleTap, handleDoubleTap, handleScrollUp, handleScrollDown }
+  return { render, drawCurrentScreen, handleTap, handleDoubleTap, handleScrollUp, handleScrollDown, toggleVoice }
 }
