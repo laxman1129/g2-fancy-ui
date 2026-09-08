@@ -1,6 +1,7 @@
 import { state, SCREEN_ORDER } from '../core/state'
 import { toPngUrl } from '../core/rendering'
 import { fmtDateShort } from '../utils/date'
+import { voice } from '../core/voice'
 import { COMPANION_STYLES } from './styles'
 import { COMPANION_TEMPLATE } from './template'
 import type { Engine } from '../app/engine'
@@ -33,9 +34,18 @@ export function mirrorCompanion(drawCurrentScreen: () => HTMLCanvasElement) {
   const badge   = document.getElementById('screenBadge') as HTMLElement | null
   const dispImg = document.getElementById('displayImg')  as HTMLImageElement | null
   const stepper = document.getElementById('stepper')     as HTMLElement | null
+  const voiceLb = document.getElementById('voiceStatus') as HTMLElement | null
   if (!badge || !dispImg || !stepper) return
 
   badge.textContent = state.screen
+
+  // Live voice-control status for the developer companion
+  if (voiceLb) {
+    voiceLb.textContent =
+      !voice.enabled ? 'VOICE OFF'
+      : voice.supported ? (voice.listening ? 'VOICE ● LISTENING' : 'VOICE ◌ READY')
+      : 'VOICE ◌ ACTIVITY ONLY'
+  }
 
   // Render full canvas and encode via UPNG for the companion preview
   dispImg.src = toPngUrl(drawCurrentScreen())

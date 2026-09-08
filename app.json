@@ -17,6 +17,10 @@
     {
       "name": "location",
       "desc": "This app needs to access the location in order to ..."
+    },
+    {
+      "name": "g2-microphone",
+      "desc": "This app uses the G2 glasses microphone to accept voice commands for navigation."
     }
   ],
   "supported_languages": [

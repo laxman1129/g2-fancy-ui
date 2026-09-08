@@ -8,6 +8,7 @@ import { toGray4 } from '../core/rendering'
 import { STRATEGIES } from '../data/strategies'
 import { DRAWERS, comparisonMaxScroll, reviewMaxScroll } from '../screens'
 import { mirrorCompanion } from '../companion/mirror'
+import { initVoice, drawVoiceOverlay, isStrategySelectRelevant, type VoiceAction } from '../core/voice'
 import type { Bridge } from './bridge'
 
 export interface Engine {
@@ -31,6 +32,7 @@ export function createEngine(bridge: Bridge): Engine {
     const c = makeCanvas()
     const ctx = c.getContext('2d')!
     DRAWERS[state.screen](ctx)
+    drawVoiceOverlay(ctx)
     return c
   }
 
@@ -124,12 +126,51 @@ export function createEngine(bridge: Bridge): Engine {
     }
   }
 
+  // ─── Voice navigation ─────────────────────────────────────────────────────
+  // Spoken keywords dispatch to the same navigation handlers as the ring —
+  // gesture input is completely untouched; voice is purely additive.
+  function dispatchVoice(action: VoiceAction) {
+    switch (action.kind) {
+      case 'tap':
+        handleTap()
+        break
+      case 'doubleTap':
+        handleDoubleTap()
+        break
+      case 'scrollUp':
+        handleScrollUp()
+        break
+      case 'scrollDown':
+        handleScrollDown()
+        break
+      case 'publish':
+        if (state.screen === 'PUBLISH') handleTap()
+        else if (state.screen === 'REVIEW') { state.screen = 'PUBLISH'; render().catch(console.error) }
+        break
+      case 'selectStrategy':
+        if (isStrategySelectRelevant(action.index)) {
+          state.strategyIdx = action.index
+          render().catch(console.error)
+        }
+        break
+      case 'goto':
+        state.screen = action.screen
+        if (action.screen === 'OPTIONS') state.strategyIdx = 0
+        if (action.screen === 'COMPARISON') state.compScroll = 0
+        if (action.screen === 'REVIEW') state.exScroll = 0
+        render().catch(console.error)
+        break
+    }
+  }
+
   // ─── Lifecycle: device events ────────────────────────────────────────────
   let cleanedUp = false
+  let stopVoice: () => void = () => {}
   function cleanup() {
     if (cleanedUp) return
     cleanedUp = true
     unsubscribe()
+    stopVoice()
   }
 
   function eventTypeOf(envelope?: { eventType?: OsEventTypeList }): OsEventTypeList | null {
@@ -163,6 +204,10 @@ export function createEngine(bridge: Bridge): Engine {
   })
 
   window.addEventListener('beforeunload', cleanup)
+
+  // Start voice control last — the startup page container already exists, so
+  // the glasses mic can be opened, and keyword dispatch flows in here.
+  stopVoice = initVoice(bridge, dispatchVoice).unsubscribe
 
   return { render, drawCurrentScreen, handleTap, handleDoubleTap, handleScrollUp, handleScrollDown }
 }
